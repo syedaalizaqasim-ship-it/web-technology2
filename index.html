@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Web Tech Quiz | CSC336 Assignment 2</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+  :root { --seg1:#3b82f6; --seg2:#ef4444; --seg3:#f59e0b; --seg4:#22c55e; --seg5:#8b5cf6; }
+  body { min-height:100vh; background:var(--bs-body-bg); transition:background .3s; }
+  .wrap { max-width:720px; }
+  .segbar { display:flex; gap:6px; }
+  .seg { flex:1; height:10px; border-radius:6px; background:var(--bs-tertiary-bg); overflow:hidden; position:relative; }
+  .seg i { position:absolute; inset:0; width:0; transition:width .4s; }
+  .seg.done i { width:100%; }
+  .seg.active i { width:100%; opacity:.45; }
+  .seg:nth-child(1) i{background:var(--seg1)} .seg:nth-child(2) i{background:var(--seg2)}
+  .seg:nth-child(3) i{background:var(--seg3)} .seg:nth-child(4) i{background:var(--seg4)}
+  .seg:nth-child(5) i{background:var(--seg5)}
+  .qcard { border-radius:14px; }
+  .opt { text-align:left; padding:.85rem 1rem; border-radius:10px; transition:transform .15s, background .2s; }
+  .opt:hover:not(:disabled) { transform:translateX(4px); }
+  .opt.correct { background:#198754 !important; border-color:#198754 !important; color:#fff !important; }
+  .opt.wrong { background:#dc3545 !important; border-color:#dc3545 !important; color:#fff !important; animation:shake .35s; }
+  @keyframes shake { 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+  .timer { font-variant-numeric:tabular-nums; font-weight:700; }
+  .timer.low { color:#ef4444; animation:pulse 1s infinite; }
+  @keyframes pulse { 50%{opacity:.4} }
+  .badge-status { min-width:90px; }
+  @media (prefers-reduced-motion:reduce){ *{animation:none !important; transition:none !important;} }
+</style>
+</head>
+<body>
+<div class="container wrap py-4 px-3">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h5 m-0">Web Technologies Quiz</h1>
+    <button id="themeBtn" class="btn btn-outline-secondary btn-sm" aria-label="Toggle dark or light mode">Light mode</button>
+  </div>
+
+  <div class="segbar mb-4" id="segbar" aria-label="Quiz progress"></div>
+
+  <!-- Start screen -->
+  <section id="startScreen" class="card qcard shadow-sm p-4 text-center">
+    <h2 class="h4">Ready to test your front-end skills?</h2>
+    <p class="text-secondary mb-4">5 random questions on HTML, CSS and JavaScript. You get 15 seconds per question.</p>
+    <button id="startBtn" class="btn btn-primary btn-lg mx-auto px-5">Start quiz</button>
+  </section>
+
+  <!-- Quiz screen -->
+  <section id="quizScreen" class="card qcard shadow-sm p-3 p-md-4 d-none">
+    <div class="d-flex justify-content-between mb-2">
+      <span id="qCount" class="text-secondary small"></span>
+      <span class="small">Time left: <span id="timer" class="timer">15s</span></span>
+    </div>
+    <h2 id="qText" class="h5 mb-3"></h2>
+    <div id="options" class="d-grid gap-2 mb-3"></div>
+    <div class="text-end">
+      <button id="nextBtn" class="btn btn-success d-none"></button>
+    </div>
+  </section>
+
+  <!-- Result screen -->
+  <section id="resultScreen" class="card qcard shadow-sm p-3 p-md-4 d-none">
+    <h2 class="h4">Quiz result</h2>
+    <p class="fs-5 mb-3">Score: <strong id="scoreText"></strong></p>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead><tr><th>#</th><th>Question</th><th>Your answer</th><th>Correct answer</th><th>Status</th></tr></thead>
+        <tbody id="resultBody"></tbody>
+      </table>
+    </div>
+    <div class="d-flex flex-wrap gap-2 mt-2">
+      <button id="pdfBtn" class="btn btn-primary">Download PDF</button>
+      <button id="restartBtn" class="btn btn-outline-secondary">Try again</button>
+    </div>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script>
+const POOL = [
+  {q:"Which method selects an element by ID in JavaScript?", o:["getElementById()","querySelectorAll()","getElementsByTag()","selectId()"], a:0},
+  {q:"Which HTML attribute is used to link CSS?", o:["rel","src","href only","style-link"], a:0},
+  {q:"Which method removes the last element of an array?", o:["pop()","shift()","splice(0)","remove()"], a:0},
+  {q:"Which JS array method adds an element to the end?", o:["push()","unshift()","append()","concat()"], a:0},
+  {q:"Which CSS property changes text color?", o:["color","font-color","text-style","fill-text"], a:0},
+  {q:"Which JS keyword declares a block-scoped variable?", o:["let","var","both let and const","function"], a:2},
+  {q:"Which HTML tag creates the largest heading?", o:["<h1>","<h6>","<head>","<title>"], a:0},
+  {q:"What does CSS stand for?", o:["Cascading Style Sheets","Creative Style System","Computer Style Sheets","Colorful Style Sheets"], a:0},
+  {q:"Which Bootstrap class makes a container full width?", o:["container-fluid","container-full","wrap-100","full-box"], a:0},
+  {q:"Which CSS feature adapts layout to screen size?", o:["Media queries","Pseudo elements","Keyframes","Z-index"], a:0},
+  {q:"Which operator checks both value and type in JavaScript?", o:["===","==","=","!="], a:0},
+  {q:"Which event fires when a button is clicked?", o:["click","press","tap","hit"], a:0}
+];
+const TOTAL = 5, TIME = 15;
+const $ = id => document.getElementById(id);
+const shuffle = a => { a = a.slice(); for (let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
+
+let qs=[], idx=0, results=[], left=TIME, tick=null, locked=false;
+
+function buildBar(){
+  $('segbar').innerHTML = Array.from({length:TOTAL},()=>'<div class="seg"><i></i></div>').join('');
+}
+function paintBar(){
+  [...$('segbar').children].forEach((s,i)=>{
+    s.classList.toggle('done', i<idx);
+    s.classList.toggle('active', i===idx && !$('quizScreen').classList.contains('d-none'));
+  });
+}
+function show(id){ ['startScreen','quizScreen','resultScreen'].forEach(s=>$(s).classList.toggle('d-none', s!==id)); }
+
+function start(){
+  qs = shuffle(POOL).slice(0,TOTAL).map(x=>{
+    const correct = x.o[x.a];
+    return {q:x.q, o:shuffle(x.o), correct};
+  });
+  idx=0; results=[]; show('quizScreen'); render();
+}
+function render(){
+  locked=false;
+  const cur = qs[idx];
+  $('qCount').textContent = `Question ${idx+1} / ${TOTAL}`;
+  $('qText').textContent = cur.q;
+  $('nextBtn').classList.add('d-none');
+  $('options').innerHTML='';
+  cur.o.forEach(text=>{
+    const b=document.createElement('button');
+    b.className='btn btn-outline-secondary opt';
+    b.textContent=text;
+    b.onclick=()=>answer(text,b);
+    $('options').appendChild(b);
+  });
+  paintBar(); startTimer();
+}
+function startTimer(){
+  clearInterval(tick); left=TIME; updTimer();
+  tick=setInterval(()=>{ left--; updTimer(); if(left<=0){ clearInterval(tick); answer(null); } },1000);
+}
+function updTimer(){ const t=$('timer'); t.textContent=left+'s'; t.classList.toggle('low', left<=5); }
+
+function answer(choice, btn){
+  if(locked) return; locked=true; clearInterval(tick);
+  const cur=qs[idx];
+  [...$('options').children].forEach(b=>{
+    b.disabled=true;
+    if(b.textContent===cur.correct) b.classList.add('correct');
+  });
+  if(choice!==null && choice!==cur.correct) btn.classList.add('wrong');
+  results.push({q:cur.q, yours:choice===null?'Not answered':choice, correct:cur.correct, ok:choice===cur.correct});
+  const nb=$('nextBtn'); nb.textContent = idx===TOTAL-1 ? 'See result' : 'Next question'; nb.classList.remove('d-none');
+}
+function next(){
+  idx++;
+  if(idx>=TOTAL){ finish(); } else render();
+}
+function finish(){
+  paintBar(); show('resultScreen');
+  const score=results.filter(r=>r.ok).length;
+  $('scoreText').textContent=`${score} / ${TOTAL}`;
+  $('resultBody').innerHTML = results.map((r,i)=>`
+    <tr><td>${i+1}</td><td>${r.q}</td><td>${r.yours}</td><td>${r.correct}</td>
+    <td><span class="badge badge-status ${r.ok?'text-bg-success':'text-bg-danger'}">${r.ok?'Correct':'Incorrect'}</span></td></tr>`).join('');
+}
+function downloadPDF(){
+  const { jsPDF } = window.jspdf; const doc = new jsPDF();
+  const score=results.filter(r=>r.ok).length;
+  doc.setFontSize(18); doc.text('Quiz Result', 14, 18);
+  doc.setFontSize(12); doc.text(`Score: ${score} / ${TOTAL}`, 14, 27);
+  doc.autoTable({
+    startY:33,
+    head:[['#','Question','Your Answer','Correct Answer','Status']],
+    body:results.map((r,i)=>[i+1,r.q,r.yours,r.correct,r.ok?'Correct':'Incorrect']),
+    styles:{fontSize:9},
+    didParseCell:d=>{ if(d.section==='body'&&d.column.index===4){ d.cell.styles.fillColor=d.cell.raw==='Correct'?[25,135,84]:[220,53,69]; d.cell.styles.textColor=255; } }
+  });
+  doc.save('Quiz_Result.pdf');
+}
+function toggleTheme(){
+  const h=document.documentElement; const dark=h.dataset.bsTheme==='dark';
+  h.dataset.bsTheme = dark?'light':'dark';
+  $('themeBtn').textContent = dark?'Dark mode':'Light mode';
+  try{ localStorage.setItem('quiz-theme', h.dataset.bsTheme); }catch(e){}
+}
+
+buildBar();
+try{ const t=localStorage.getItem('quiz-theme'); if(t){ document.documentElement.dataset.bsTheme=t; $('themeBtn').textContent = t==='dark'?'Light mode':'Dark mode'; } }catch(e){}
+$('startBtn').onclick=start; $('nextBtn').onclick=next; $('pdfBtn').onclick=downloadPDF;
+$('restartBtn').onclick=()=>{ idx=0; paintBar(); show('startScreen'); };
+$('themeBtn').onclick=toggleTheme;
+</script>
+</body>
+</html>
